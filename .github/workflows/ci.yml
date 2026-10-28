@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main, master, dev]
   push:
-    branches: [main, master, dev, "avrana/**"]   # Avrana fork: test its branches too
+    branches: [main, master, dev]
+  workflow_call:   # Avrana fork: avrana-image.yml runs this whole suite before it builds
 
 permissions:
   contents: read
