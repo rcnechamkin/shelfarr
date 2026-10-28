@@ -859,4 +859,42 @@ class API::V1::RequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
   end
+
+  test "on_behalf token lists and cancels only the named member's requests" do
+    _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two),
+                                  scopes: %w[requests:write requests:read requests:on_behalf])
+    auth = { "Authorization" => "Bearer #{raw}" }
+    post api_v1_requests_path, headers: auth,
+      params: { username: @user.username, work_id: "openlibrary:OL_OB_LIST_123W", book_type: "ebook", title: "Mine" }
+    mine = Request.last
+    other = User.create!(username: "membertwo", name: "Member Two", role: 0, password: "Password123!",
+                         password_confirmation: "Password123!")
+    post api_v1_requests_path, headers: auth,
+      params: { username: other.username, work_id: "openlibrary:OL_OB_OTHER_123W", book_type: "ebook", title: "Theirs" }
+    theirs = Request.last
+
+    get api_v1_requests_path, headers: auth, params: { username: @user.username }
+    ids = JSON.parse(response.body)["requests"].map { |request| request["id"] }
+    assert_includes ids, mine.id
+    assert_not_includes ids, theirs.id
+
+    get api_v1_request_path(theirs), headers: auth, params: { username: @user.username }
+    assert_response :not_found
+    delete api_v1_request_path(theirs), headers: auth, params: { username: @user.username }
+    assert_response :not_found
+    assert Request.find(theirs.id).pending?
+
+    delete api_v1_request_path(mine), headers: auth, params: { username: @user.username }
+    assert_response :success
+  end
+
+  test "on_behalf token never lists an administrator's requests" do
+    _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two), scopes: %w[requests:read requests:on_behalf])
+    get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }, params: { username: users(:two).username }
+    assert_response :success
+    assert_equal [], JSON.parse(response.body)["requests"]
+
+    get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }, params: { username: "nobody-here" }
+    assert_equal [], JSON.parse(response.body)["requests"]
+  end
 end

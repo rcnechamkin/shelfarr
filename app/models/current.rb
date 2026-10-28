@@ -11,8 +11,9 @@ class Current < ActiveSupport::CurrentAttributes
     legacy_api_token_authenticated || api_token&.has_scope?("requests:admin")
   end
 
-  # May create a request naming another active user (`username` / `user_id`), and nothing more: no listing, showing,
-  # cancelling, retrying or grabbing other users' requests. For a front end that asks on its members' behalf.
+  # May create a request naming another active non-admin user (`username` / `user_id`), and list, show or cancel
+  # THAT user's requests when the call names them (`username`). Never retry, grab or blocklist, never see everyone's.
+  # For a front end that asks on its members' behalf.
   def api_on_behalf?
     api_admin? || api_token&.has_scope?("requests:on_behalf")
   end

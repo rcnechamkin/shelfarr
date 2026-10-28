@@ -146,7 +146,20 @@ class API::V1::RequestsController < API::V1::ApplicationController
     nil
   end
 
+  # On behalf: `username` names ONE member whose requests a front end lists, shows or cancels for them. Never an
+  # administrator's (unless the token itself is admin-scoped); an unknown or refused name sees nothing.
+  def named_member
+    return @named_member if defined?(@named_member)
+
+    name = params[:username].to_s.strip.downcase
+    user = User.active.find_by(username: name) if name.present?
+    @named_member = user if user && (Current.api_admin? || !user.admin?)
+  end
+
   def request_scope
+    if params[:username].present? && Current.api_on_behalf?
+      return named_member ? Request.for_user(named_member) : Request.none
+    end
     return Request.all if Current.api_admin?
     return Request.for_user(Current.api_user) if Current.api_user
 
