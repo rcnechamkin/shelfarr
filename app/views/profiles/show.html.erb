@@ -129,6 +129,15 @@
                 <span><%= label %></span>
               </label>
             <% end %>
+            <% if Current.user.admin? %>
+              <%# Privileged scopes: off by default. "On behalf" lets a front end create requests for other (non-admin) users and nothing else. %>
+              <% [["requests:on_behalf", "Create requests for other users"], ["requests:admin", "Administer all requests"], ["users:write", "Manage users"]].each do |scope, label| %>
+                <label class="inline-flex items-center gap-2">
+                  <%= check_box_tag "scopes[]", scope, false, class: "rounded border-gray-600 bg-gray-700 text-amber-600 focus:ring-amber-500" %>
+                  <span><%= label %></span>
+                </label>
+              <% end %>
+            <% end %>
           </div>
         <% end %>
 

@@ -138,8 +138,10 @@ class API::V1::RequestsController < API::V1::ApplicationController
       Current.api_user
     end
 
-    return requested_user if Current.api_admin?
     return requested_user if requested_user && requested_user == Current.api_user
+    return requested_user if Current.api_admin?
+    # On behalf: any active user except an admin (a front end never acts as an administrator).
+    return requested_user if Current.api_on_behalf? && requested_user && !requested_user.admin?
 
     nil
   end

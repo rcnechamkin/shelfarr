@@ -190,6 +190,60 @@ class API::V1::RequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "admin-owned token without requests:admin acts only for its owner" do
+    _token, raw = APIToken.issue!(name: "Admin script", user: users(:two), scopes: %w[requests:write requests:read])
+
+    post api_v1_requests_path,
+      headers: { "Authorization" => "Bearer #{raw}" },
+      params: { username: @user.username, work_id: "openlibrary:OL_ADMIN_OWNED_123W", book_type: "ebook",
+                title: "Admin Owned Token Book" }
+    assert_response :not_found
+
+    get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }
+    assert_response :success
+    assert JSON.parse(response.body)["requests"].all? { |request| request.dig("user", "username") == users(:two).username }
+  end
+
+  test "on_behalf token creates for a member but cannot see or touch other requests" do
+    _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two),
+                                  scopes: %w[search:read requests:write requests:read requests:on_behalf])
+
+    assert_difference "Request.count", 1 do
+      post api_v1_requests_path,
+        headers: { "Authorization" => "Bearer #{raw}" },
+        params: { username: @user.username, work_id: "openlibrary:OL_ON_BEHALF_123W", book_type: "ebook",
+                  title: "On Behalf Book" }
+    end
+    assert_response :created
+    created = Request.last
+    assert_equal @user, created.user
+
+    get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }
+    assert JSON.parse(response.body)["requests"].none? { |request| request["id"] == created.id }
+
+    delete api_v1_request_path(created), headers: { "Authorization" => "Bearer #{raw}" }
+    assert_response :not_found
+    assert Request.exists?(created.id)
+  end
+
+  test "on_behalf scope needs an admin owner and never names an admin" do
+    _token, member_raw = APIToken.issue!(name: "Member", user: @user, scopes: %w[requests:write requests:on_behalf])
+    post api_v1_requests_path,
+      headers: { "Authorization" => "Bearer #{member_raw}" },
+      params: { username: users(:two).username, work_id: "openlibrary:OL_MEMBER_OB_123W", book_type: "ebook",
+                title: "Member On Behalf Book" }
+    assert_response :not_found
+
+    admin = User.create!(username: "secondadmin", name: "Second Admin", role: 1, password: "Password123!",
+                         password_confirmation: "Password123!")
+    _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two), scopes: %w[requests:write requests:on_behalf])
+    post api_v1_requests_path,
+      headers: { "Authorization" => "Bearer #{raw}" },
+      params: { username: admin.username, work_id: "openlibrary:OL_NAME_ADMIN_123W", book_type: "ebook",
+                title: "Name An Admin Book" }
+    assert_response :not_found
+  end
+
   test "lists requests visible to scoped token user" do
     _token, raw = APIToken.issue!(
       name: "Reader",

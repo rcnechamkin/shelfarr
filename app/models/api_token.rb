@@ -2,7 +2,7 @@
 
 class APIToken < ApplicationRecord
   TOKEN_PREFIX = "shf_"
-  AVAILABLE_SCOPES = %w[search:read requests:read requests:write requests:admin users:write].freeze
+  AVAILABLE_SCOPES = %w[search:read requests:read requests:write requests:on_behalf requests:admin users:write].freeze
   SELF_SERVICE_SCOPES = %w[search:read requests:read requests:write].freeze
   PRIVILEGED_SCOPES = (AVAILABLE_SCOPES - SELF_SERVICE_SCOPES).freeze
 
