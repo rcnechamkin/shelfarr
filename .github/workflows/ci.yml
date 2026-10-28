@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, master, dev]
   push:
-    branches: [main, master, dev]
+    branches: [main, master, dev, "avrana/**"]   # Avrana fork: test its branches too
 
 permissions:
   contents: read
