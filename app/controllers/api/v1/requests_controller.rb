@@ -7,6 +7,14 @@ class API::V1::RequestsController < API::V1::ApplicationController
   before_action :set_request, only: [ :show, :destroy, :retry, :search_results, :grab, :blocklist_and_next ]
 
   def index
+    # On behalf: a name that is not an active non-admin member is "User not found", as create says, so a front end
+    # can tell "no Shelfarr account yet" from "no requests". The token can already create users (users:write), so
+    # this tells it nothing new.
+    if params[:username].present? && Current.api_on_behalf? && !named_member
+      render json: { errors: [ "User not found" ] }, status: :not_found
+      return
+    end
+
     requests = request_scope.includes(:book, :user).order(created_at: :desc)
     requests = requests.where(status: params[:status]) if params[:status].present?
     requests = requests.where(created_via: params[:created_via]) if params[:created_via].present?

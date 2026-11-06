@@ -891,10 +891,26 @@ class API::V1::RequestsControllerTest < ActionDispatch::IntegrationTest
   test "on_behalf token never lists an administrator's requests" do
     _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two), scopes: %w[requests:read requests:on_behalf])
     get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }, params: { username: users(:two).username }
+    assert_response :not_found
+    assert_equal [ "User not found" ], JSON.parse(response.body)["errors"]
+    assert_nil JSON.parse(response.body)["requests"]
+  end
+
+  test "on_behalf token tells an unknown or removed member from one with no requests" do
+    _token, raw = APIToken.issue!(name: "Avrana Home", user: users(:two), scopes: %w[requests:read requests:on_behalf])
+    auth = { "Authorization" => "Bearer #{raw}" }
+    get api_v1_requests_path, headers: auth, params: { username: "nobody-here" }
+    assert_response :not_found
+    assert_equal [ "User not found" ], JSON.parse(response.body)["errors"]
+
+    fresh = User.create!(username: "freshmember", name: "Fresh Member", role: 0, password: "Password123!",
+                         password_confirmation: "Password123!")
+    get api_v1_requests_path, headers: auth, params: { username: fresh.username }
     assert_response :success
     assert_equal [], JSON.parse(response.body)["requests"]
 
-    get api_v1_requests_path, headers: { "Authorization" => "Bearer #{raw}" }, params: { username: "nobody-here" }
-    assert_equal [], JSON.parse(response.body)["requests"]
+    fresh.update_columns(deleted_at: Time.current)
+    get api_v1_requests_path, headers: auth, params: { username: fresh.username }
+    assert_response :not_found
   end
 end
